@@ -1,4 +1,4 @@
-package com.rafoul.lab.patterns.command
+package com.rafoul.lab.prototyping.command
 
 import org.junit.Test
 import java.lang.IllegalStateException

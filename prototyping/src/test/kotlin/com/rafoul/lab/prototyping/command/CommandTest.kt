@@ -6,45 +6,44 @@ import java.lang.IllegalStateException
 
 class CommandTest {
 
-    private val executor = DefaultExecutor()
+    private val shell = DefaultShellCommandExecutor()
+
+    private val executors: List<CommandRequestHandler> = listOf(
+            LocalShellCommandHandler(shell),
+            LocalShellContainerCommandHandler(shell)
+    )
+
+    private fun pickup(req: CommandRequest): CommandRequestHandler {
+        return executors.maxBy { it.supports(req) }!!
+    }
 
     @Test
     fun testRunCommand() {
-        executor.execute(getCommand())
-        executor.execute(getContainerCommand())
-    }
-
-    @Test
-    fun testRunComplexCommand() {
-        val taskAwareCmd = getTaskAwareCommand()
-        val unwrapped = if (taskAwareCmd.command is ContainerCommand) {
-            TaskAwareContainerCommand(
-                    taskAwareCmd.command as ContainerCommand,
-                    taskAwareCmd.taskContext
-            )
-        } else {
-            throw IllegalStateException()
+        listOf(
+                getLocalCommand(),
+                getContainerCommand()
+        ).forEach {req->
+            pickup(req).handles(req)
         }
-        executor.execute(unwrapped)
     }
 
-    private fun getCommand() = DefaultCommand(
+    private fun getCommand() = ShellCommandImpl(
             "/tmp/helloworld",
             listOf("javac HelloWorld && java HelloWorld"),
-            emptyMap()
+            mapOf("SERVER_ADDR" to "localhost")
     )
 
-    private fun getContainerCommand() = DefaultContainerCommand(
+    private fun getLocalCommand() = TaskAwareLocalShellCommandRequest(
+            getTaskContext(),
+            getCommand()
+    )
+
+    private fun getContainerCommand() = TaskAwareContainerCommandRequest(
+            getTaskContext(),
             getCommand().copy(workingDir = "/usr/share/helloworld"),
             "openjdk",
             mapOf("/tmp/helloworld" to "/usr/share/helloworld"),
             ""
-    )
-
-    private fun getTaskAwareCommand() = DefaultTaskAwareCommand(
-            getContainerCommand(),
-            getTaskContext()
-
     )
 
     private fun getTaskContext() = DefaultTaskContext(
